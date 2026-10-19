@@ -161,7 +161,7 @@ class Base extends Request {
 			'shipping_zip'             => $order->get_shipping_postcode(),
 			'shipping_addressaddition' => $order->get_shipping_address_2(),
 			'shipping_city'            => $order->get_shipping_city(),
-			'shipping_state'           => $order->get_shipping_state(),
+			'shipping_state'           => $this->fix_shipping_state( $order->get_shipping_state() ),
 			'shipping_country'         => $order->get_shipping_country(),
 			'shipping_telephonenumber' => $order->get_shipping_phone(),
 		];
@@ -177,6 +177,37 @@ class Base extends Request {
 				$this->set( $name, $value );
 			}
 		}
+	}
+
+	/**
+	 * WordPress does not always return ISO 3166-2 for states. See /woocommerce/i18n/states.php
+	 * We do not completely map al their wron values to correct ones, but a simple solution is to remove
+	 * non numeric characters. For instance "JP1" => "01" or "JM-10" => "10".
+	 * We also provide the hook "payone_fix_shipping_state" so that shop owner can fix specific shipping_states
+	 * where they have more insight about the correctness of the value.
+	 *
+	 * @param string $original_shipping_state
+	 *
+	 * @return string
+	 */
+	protected function fix_shipping_state( $original_shipping_state ) {
+		// - rmeove all non numeric characters
+		// - add leading zeros
+		// - limnit to two characters (ISO 3166-2)
+		$fixed_shipping_state = substr(
+			sprintf(
+				'%02d',
+				preg_replace(
+					'~\D~',
+					'',
+					$original_shipping_state
+				)
+			),
+			0,
+			2
+		);
+
+		return apply_filters( 'payone_fix_shipping_state', $fixed_shipping_state, $original_shipping_state );
 	}
 
 	protected function has_no_shipping_data()
